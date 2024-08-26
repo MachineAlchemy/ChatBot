@@ -41,7 +41,7 @@ def embed_chunk(chunk, tokenizer, model):
     return chunk_embedding
 
 # Path to the folder where the chunked text files are stored
-chunked_folder_path = '/semantic_chunks'  # Ensure this is the correct path
+chunked_folder_path = 'semantic_chunks'  # Ensure this is the correct path
 
 # Iterate over each chunked file
 for filename in os.listdir(chunked_folder_path):

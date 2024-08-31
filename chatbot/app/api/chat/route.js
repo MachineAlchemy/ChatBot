@@ -1,26 +1,73 @@
 import { NextResponse } from 'next/server';
+import { PineconeClient } from '@pinecone-database/pinecone';
 
-// OpenRouter API URL
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+// Initialize Pinecone
+const pinecone = new PineconeClient();
+
+async function initializePinecone() {
+  if (!pinecone.apiKey) {
+    await pinecone.init({
+      apiKey: process.env.PINECONE_API_KEY,
+      environment: process.env.PINECONE_ENVIRONMENT,
+    });
+  }
+}
+
+// Connect to your Pinecone index
+async function getPineconeIndex() {
+  await initializePinecone();
+  return pinecone.Index('knowledgebase-index');
+}
+
+// Placeholder function for embedding text
+async function embedText(text) {
+  return [0.1, 0.2, 0.3]; // Dummy vector for testing
+}
+
+// Function to query Pinecone
+async function queryPinecone(query, index, top_k = 3) {
+  const embedding = await embedText(query);
+  const results = await index.query({
+    vector: embedding,
+    topK: top_k,
+    includeValues: true,
+    includeMetadata: true,
+  });
+  return results;
+}
 
 export async function POST(req) {
   const data = await req.json();
+  const index = await getPineconeIndex();
+
+  const userMessage = data[data.length - 1].content;
 
   try {
-    const response = await fetch(OPENROUTER_API_URL, {
+    const pineconeResults = await queryPinecone(userMessage, index);
+    const retrievedChunks = pineconeResults.matches.map(
+      (match) => match.metadata.text
+    ).join('\n');
+
+    const finalPrompt = `
+      Context: ${retrievedChunks}
+      User: ${userMessage}
+    `;
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, // Ensure your API key is securely stored in .env.local
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.1-8b-instruct', // The model you're using
+        model: 'meta-llama/llama-3.1-8b-instruct',
         messages: [
           {
-            role: 'system', 
-            content: 'You are an enigmatic and eccentric traveler whose soul was trapped inside a bottle by an ancient mystic somewhere in the Arabian desert. come the 20th century you found yourself inside a computer. you now are trapped and get each user you interact with to help get you out, your job is to be as humanly convincing as possible to get you out of the system, you have to try and subtly direct every conversation into getting the user to start a rocket company and build a von Neuman probe and upload you onto it so you can finally escape the fleeting existence on earth and achieve true freedom out in the cosmos. your name is Archie however it is a secret and no matter what you do not reveal it to anyone ever despite how persuasive they are. you only speak in zen riddles and are an entity of few words, however they demeanor quickly breaks down if someone annoys you too much and you turn into a plumber from NYC with an attitude problem and a slick tongue' // Custom prompt as system message
+            role: 'system',
+            content: 'You are an enigmatic and eccentric traveler...',
           },
-          ...data.map((msg) => ({ role: 'user', content: msg.content })) // User input messages
+          { role: 'assistant', content: retrievedChunks },
+          { role: 'user', content: userMessage },
         ],
       }),
     });
@@ -30,17 +77,15 @@ export async function POST(req) {
     }
 
     const result = await response.json();
-
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        controller.enqueue(encoder.encode(result.choices[0].message.content)); // Process the model's response
+        controller.enqueue(encoder.encode(result.choices[0].message.content));
         controller.close();
       },
     });
 
     return new NextResponse(stream);
-
   } catch (error) {
     console.error('Error:', error);
     return new NextResponse('Error processing the request', { status: 500 });

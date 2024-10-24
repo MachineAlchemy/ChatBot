@@ -28,7 +28,7 @@ An intelligent chatbot powered by Next.js and Llama3.1-8b-instruct that provides
 ## Technical Stack
 - **Frontend**: Next.js, React
 - **UI Components**: Material-UI (@mui/material)
-- **AI/ML**: 
+- **AI/ML**:
   - **OpenRouter API:** OpenRouter is a service that provides access to various LLMs including Llama,
   -  Claude, and others, often at more affordable rates than direct API access.
   -  It acts as an intermediary service that can route requests to different LLM providers while providing a unified API interface.
@@ -50,7 +50,9 @@ An intelligent chatbot powered by Next.js and Llama3.1-8b-instruct that provides
 Create a `.env.local` file with the following variables:
 
 AI_API_KEY=your_api_key
+
 PINECONE_API_KEY=your_pinecone_key
+
 PINECONE_ENVIRONMENT=your_environment
 
 
